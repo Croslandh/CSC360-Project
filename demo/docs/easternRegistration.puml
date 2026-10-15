@@ -3,35 +3,62 @@ skinparam classAttributeIconSize 0
 hide circle
 
 class EasternSchedule {
-  -{static} BASE: String = "https://reg-prod.ec.easternct.edu/StudentRegistrationSsb"
+  -{static} BASE: String
   -term: String
   ~cookieManager: CookieManager
   ~client: HttpClient
   --
   +EasternSchedule()
   +getTerm(): String
+  +getAvailableTerms(): ArrayList<Term>
+  +queryCourseBySubject(subject: String): ArrayList<Course>
   -retrieveTerms(): String
   -parseTerms(content: String): ArrayList<Term>
   -parseCourses(content: String): ArrayList<Course>
-  +getAvailableTerms(): ArrayList<Term>
   -postTerm(): String
   -createCacheFile(subject: String): Path
   -cacheCourses(subject: String): void
-  +queryCourseBySubject(subject: String): ArrayList<Course>
 }
 
-record Course {
-  -id : String
+class Course <<record>> {
+  -id: String
   -subject: String
   -courseNumber: String
   -meetingsFaculty: List<MeetingFaculty>
+  -courseTitle: String
+  -creditHours: Double
+  -creditHourLow: Double
+  -creditHourHigh: Double
+  -enrollment: Integer
+  -maximumEnrollment: Integer
+  -seatsAvailable: Integer
+  -openSection: Boolean
+  -faculty: List<Faculty>
+  -courseReferenceNumber: String
+  --
+  +Course(id: String, subject: String, courseNumber: String, meetingsFaculty: List<MeetingFaculty>, courseTitle: String, creditHours: Double, creditHourLow: Double, creditHourHigh: Double, enrollment: Integer, maximumEnrollment: Integer, seatsAvailable: Integer, openSection: Boolean, faculty: List<Faculty>, courseReferenceNumber: String)
+  +Course(id: String, subject: String, courseNumber: String, meetingsFaculty: List<MeetingFaculty>, courseTitle: String, creditHours: Double, creditHourLow: Double, creditHourHigh: Double, enrollment: Integer, maximumEnrollment: Integer, seatsAvailable: Integer)
+  +Course(id: String, subject: String, courseNumber: String, meetingsFaculty: List<MeetingFaculty>, courseTitle: String, creditHours: Double, creditHourLow: Double, creditHourHigh: Double)
+  +Course(id: String, subject: String, courseNumber: String, meetingsFaculty: List<MeetingFaculty>)
+  +toString(): String
+  -creditsDescription(): String
+  -sectionCredits(): Double
+  -{static} formatCredits(value: Double): String
+  -{static} hasText(value: String): boolean
+  -{static} appendDetail(result: StringBuilder, detail: String): void
 }
 
-record MeetingFaculty {
+class "Course.Faculty" as CourseFaculty <<record>> {
+  -displayName: String
+}
+
+class "Course.MeetingFaculty" as MeetingFaculty <<record>> {
   -meetingTime: MeetingTime
+  --
+  +toString(): String
 }
 
-record MeetingTime {
+class "Course.MeetingTime" as MeetingTime <<record>> {
   -monday: boolean
   -tuesday: boolean
   -wednesday: boolean
@@ -39,19 +66,120 @@ record MeetingTime {
   -friday: boolean
   -saturday: boolean
   -sunday: boolean
+  -beginTime: String
+  -endTime: String
+  -creditHourSession: Double
+  --
+  +MeetingTime(monday: boolean, tuesday: boolean, wednesday: boolean, thursday: boolean, friday: boolean, saturday: boolean, sunday: boolean, beginTime: String, endTime: String, creditHourSession: Double)
+  +MeetingTime(monday: boolean, tuesday: boolean, wednesday: boolean, thursday: boolean, friday: boolean, saturday: boolean, sunday: boolean, beginTime: String, endTime: String)
+  +MeetingTime(monday: boolean, tuesday: boolean, wednesday: boolean, thursday: boolean, friday: boolean, saturday: boolean, sunday: boolean)
+  +toString(): String
+  -{static} formatTime(value: String): String
 }
 
-record Term {
+class Term <<record>> {
   -code: String
   -description: String
 }
 
-'Aggregation and composition
-MeetingFaculty "1" o-- "1" MeetingTime : has a >
-Course "1" 0-- "0*" MeetingFaculty: has a >
+class Student {
+  +{static} MAX_CREDITS: int = 17
+  -studentId: String
+  -firstName: String
+  -lastName: String
+  -registeredCourses: List<Course>
+  --
+  +Student(studentId: String, firstName: String, lastName: String)
+  +getStudentId(): String
+  +getFirstName(): String
+  +getLastName(): String
+  +registerCourse(course: Course): void
+  +registerCourses(courses: List<Course>): void
+  +dropCourse(course: Course): boolean
+  +dropAllCourses(): void
+  +getSchedule(): List<Course>
+  -{static} isFull(course: Course): boolean
+  -{static} exactCredits(course: Course): double
+  -{static} requireValidCredits(credits: double, course: Course): double
+  -{static} missingCredits(course: Course): IllegalArgumentException
+  -{static} containsCourse(courses: List<Course>, candidate: Course): boolean
+  -{static} sameCourse(first: Course, second: Course): boolean
+  -{static} hasMeetingConflict(first: Course, second: Course): boolean
+  -{static} sameMeetingDay(first: MeetingTime, second: MeetingTime): boolean
+  -{static} parseTime(value: String): int
+  -{static} requireText(value: String, label: String): String
+}
 
-'Dependencies
-EasternSchedule ..> Term : uses
-EasternSchedule ..> Course : uses
+class MainMenu {
+  -easternSchedule: EasternSchedule
+  -student: Student
+  -scanner: Scanner
+  -inputEnded: boolean
+  --
+  +MainMenu()
+  +MainMenu(easternSchedule: EasternSchedule, student: Student)
+  +MainMenu(easternSchedule: EasternSchedule, student: Student, scanner: Scanner)
+  +open(): void
+  -promptForStudentDetails(): boolean
+  -displayMenu(): void
+  -displayCoursesForSubject(): void
+  -searchCourses(): void
+  -registerForCourse(): void
+  -dropCourses(): void
+  -displayStudentSchedule(): void
+  -chooseCourse(courses: List<Course>, prompt: String): Course
+  -printCourses(courses: List<Course>, heading: String): void
+  -printNumberedCourses(courses: List<Course>): void
+  -promptSubject(): String
+  -readRequired(prompt: String): String
+  -readOptional(prompt: String): String
+  -promptYesNo(prompt: String): Boolean
+  -promptExcludedDay(): Day
+  -readLine(prompt: String): String
+  -reportScheduleError(subject: String, exception: Exception): void
+  -reportUnknownFilterData(openRequested: boolean, unknownOpen: int, instructorRequested: boolean, unknownInstructor: int, dayRequested: boolean, unknownDays: int): void
+  -{static} isOpen(course: Course): Boolean
+  -{static} instructorNames(course: Course): List<String>
+  -{static} courseHasKnownDay(course: Course, excludedDay: Day): DayMatch
+  -{static} hasAnyDay(time: MeetingTime): boolean
+  -{static} sameText(first: String, second: String): boolean
+}
+
+enum "MainMenu.DayMatch" as DayMatch {
+  MATCHES_EXCLUDED_DAY
+  DOES_NOT_MATCH_EXCLUDED_DAY
+  UNKNOWN
+}
+
+enum "MainMenu.Day" as Day {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+  --
+  -shortName: String
+  -fullName: String
+  -Day(shortName: String, fullName: String)
+  -isScheduled(time: MeetingTime): boolean
+  -{static} fromInput(value: String): Day
+}
+
+' Course contains records for its instructors and meeting information.
+Course "1" *-- "0..*" MeetingFaculty: meetingsFaculty
+Course "1" *-- "0..*" CourseFaculty: faculty
+MeetingFaculty "1" *-- "0..1" MeetingTime: meetingTime
+
+' The student owns the registration list; the menu delegates registration actions.
+Student "1" o-- "0..*" Course: registeredCourses
+MainMenu --> Student: manages
+MainMenu --> EasternSchedule: retrieves courses
+MainMenu ..> Day: filters by day
+MainMenu ..> DayMatch: evaluates day filter
+Day ..> MeetingTime: reads weekday flags
+EasternSchedule ..> Course: parses and returns
+EasternSchedule ..> Term: parses and returns
 
 @enduml
